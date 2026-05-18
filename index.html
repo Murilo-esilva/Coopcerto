@@ -113,6 +113,7 @@
     <script>
         let db = []; // Armazenará os registros processados do arquivo
         let debounceTimer; // Para debouncing de busca
+        let htmlCache = {}; // Cache de HTML gerado dos cards
 
         const fileInput = document.getElementById('file-input');
         const loadStatus = document.getElementById('load-status');
@@ -166,10 +167,74 @@
             }
         }
 
+        // Gera HTML do card uma única vez e o cacheia
+        function generateCardHtml(item, index) {
+            if (htmlCache[index]) return htmlCache[index];
+
+            let badgeClass = "bg-amber-50 text-amber-700 border-amber-200";
+            if (item.produto.toLowerCase().includes("refeição") && item.produto.toLowerCase().includes("alimentação")) {
+                badgeClass = "bg-blue-50 text-blue-700 border-blue-200";
+            } else if (item.produto.toLowerCase().includes("refeição")) {
+                badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
+            }
+
+            const localizacaoCompleta = `${item.endereco}, ${item.bairro}, ${item.cidade} - ${item.uf}`;
+            const mapsLink = `https://www.google.com/maps/search/${encodeURIComponent(localizacaoCompleta)}`;
+
+            const cardHtml = `
+                <div class="bg-white rounded-xl shadow-xs border border-gray-100 hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group">
+                    <div class="p-5">
+                        <div class="flex justify-between items-start gap-2 mb-3">
+                            <span class="px-2.5 py-0.5 text-[11px] font-semibold rounded-full border ${badgeClass}">
+                                ${item.produto}
+                            </span>
+                            <span class="text-[10px] text-gray-400 font-mono" title="CNPJ">${item.cnpj}</span>
+                        </div>
+                        
+                        <h3 class="font-bold text-gray-900 text-lg group-hover:text-emerald-600 transition-colors line-clamp-2" title="Nome Fantasia">
+                            ${escapeHtml(item.fantasia)}
+                        </h3>
+                        <p class="text-xs text-gray-400 mt-0.5 mb-4 truncate" title="Razão Social"><strong>Razão:</strong> ${escapeHtml(item.razao)}</p>
+                        
+                        <div class="space-y-2 text-sm text-gray-600 border-b border-gray-100 pb-4 mb-4">
+                            <p class="flex items-start gap-2">
+                                <i class="fa-solid fa-location-dot text-gray-400 mt-1 shrink-0"></i>
+                                <span class="line-clamp-2">${escapeHtml(item.endereco)}</span>
+                            </p>
+                            <p class="flex items-center gap-2">
+                                <i class="fa-solid fa-map-pin text-gray-400 shrink-0"></i>
+                                <span>${escapeHtml(item.bairro)} — <strong class="text-gray-700 font-normal">${escapeHtml(item.cidade)}/${escapeHtml(item.uf)}</strong></span>
+                            </p>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-y-2 gap-x-1 text-[11px] text-gray-500 bg-gray-50 p-2 rounded border border-gray-100 font-mono">
+                            <div><strong class="text-gray-400 block font-sans">Última Venda:</strong> ${escapeHtml(item.ultimaVenda)}</div>
+                            <div><strong class="text-gray-400 block font-sans">Tempo Cad.:</strong> ${escapeHtml(item.tempoCadastro)}</div>
+                            <div class="col-span-2 border-t border-gray-200/60 mt-1 pt-1"><strong class="text-gray-400 inline font-sans">Data Base:</strong> ${escapeHtml(item.dataBase)}</div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-gray-50/70 border-t border-gray-100">
+                        <a href="${mapsLink}" target="_blank" rel="noopener noreferrer"
+                           class="w-full inline-flex justify-center items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-semibold rounded-lg text-xs hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all"
+                           aria-label="Abrir localização no Google Maps">
+                            <i class="fa-solid fa-map-location-dot text-emerald-500"></i> Rota no Google Maps
+                        </a>
+                    </div>
+                </div>
+            `;
+
+            htmlCache[index] = cardHtml;
+            return cardHtml;
+        }
+
         // Inicializa a aplicação após carregar os dados
         function initializeApp() {
             searchInput.disabled = false;
             productFilter.disabled = false;
+            
+            // Pré-gera todos os cards e os cacheia
+            db.forEach((item, index) => generateCardHtml(item, index));
             
             // Popula dinamicamente o filtro de produtos detectados (ordenado)
             const detectedProducts = new Set(db.map(item => item.produto));
@@ -197,22 +262,20 @@
                     const text = evt.target.result;
                     const lines = text.split(/\r?\n/);
                     db = [];
+                    htmlCache = {}; // Limpa o cache
                     const detectedProducts = new Set();
                     let headerProcessed = false;
 
                     lines.forEach((line, index) => {
                         if (!line.trim()) return;
 
-                        // Pula a linha de cabeçalho na primeira iteração
                         if (!headerProcessed && index === 0) {
                             headerProcessed = true;
                             return;
                         }
 
-                        // Detecta se o delimitador é Tabulação (\t) ou Ponto e Vírgula (;)
                         const columns = line.includes('\t') ? line.split('\t') : line.split(';');
                         
-                        // Valida se a linha tem o mínimo de colunas necessárias
                         if (columns.length >= 8) {
                             try {
                                 const registro = {
@@ -229,7 +292,6 @@
                                     dataBase: (columns[10]?.trim() || "N/A").replace(/\s+/g, ' ')
                                 };
                                 
-                                // Validação: rejeita registros sem dados essenciais
                                 if (registro.endereco !== "N/A" && registro.bairro !== "N/A") {
                                     db.push(registro);
                                     detectedProducts.add(registro.produto);
@@ -242,12 +304,13 @@
 
                     if(db.length > 0) {
                         loadStatus.textContent = `${file.name} (${db.length} registros)`;
-                        // Popula dinamicamente o filtro de produtos detectados (ordenado)
                         productFilter.innerHTML = '<option value="todos">Todos os Produtos</option>';
                         Array.from(detectedProducts).sort().forEach(prod => {
                             productFilter.innerHTML += `<option value="${prod}">${prod}</option>`;
                         });
 
+                        // Pré-gera todos os cards
+                        db.forEach((item, index) => generateCardHtml(item, index));
                         applyFilters();
                     } else {
                         loadStatus.textContent = "Erro na leitura";
@@ -268,7 +331,7 @@
             reader.readAsText(file, 'UTF-8');
         });
 
-        // Renderiza os cards dinamicamente baseando-se nos filtros aplicados
+        // Renderiza os cards dinamicamente baseando-se nos filtros aplicados - OTIMIZADO
         function drawCards(data) {
             container.innerHTML = '';
             totalCount.textContent = data.length;
@@ -280,68 +343,17 @@
 
             placeholder.classList.add('hidden');
 
+            // Usa DocumentFragment para inserção mais rápida
+            const fragment = document.createDocumentFragment();
+            const tempDiv = document.createElement('div');
+
             data.forEach((item, index) => {
-                // Personalização visual da tag de benefício
-                let badgeClass = "bg-amber-50 text-amber-700 border-amber-200";
-                if (item.produto.toLowerCase().includes("refeição") && item.produto.toLowerCase().includes("alimentação")) {
-                    badgeClass = "bg-blue-50 text-blue-700 border-blue-200";
-                } else if (item.produto.toLowerCase().includes("refeição")) {
-                    badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
-                }
-
-                // URL de busca estruturada para o Google Maps
-                const localizacaoCompleta = `${item.endereco}, ${item.bairro}, ${item.cidade} - ${item.uf}`;
-                const mapsLink = `https://www.google.com/maps/search/${encodeURIComponent(localizacaoCompleta)}`;
-
-                const cardHtml = `
-                    <div class="bg-white rounded-xl shadow-xs border border-gray-100 hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group">
-                        <div class="p-5">
-                            <!-- Cabeçalho do Card -->
-                            <div class="flex justify-between items-start gap-2 mb-3">
-                                <span class="px-2.5 py-0.5 text-[11px] font-semibold rounded-full border ${badgeClass}">
-                                    ${item.produto}
-                                </span>
-                                <span class="text-[10px] text-gray-400 font-mono" title="CNPJ">${item.cnpj}</span>
-                            </div>
-                            
-                            <!-- Títulos principais (Priorizando Fantasia conforme pedido) -->
-                            <h3 class="font-bold text-gray-900 text-lg group-hover:text-emerald-600 transition-colors line-clamp-2" title="Nome Fantasia">
-                                ${escapeHtml(item.fantasia)}
-                            </h3>
-                            <p class="text-xs text-gray-400 mt-0.5 mb-4 truncate" title="Razão Social"><strong>Razão:</strong> ${escapeHtml(item.razao)}</p>
-                            
-                            <!-- Bloco de Localização -->
-                            <div class="space-y-2 text-sm text-gray-600 border-b border-gray-100 pb-4 mb-4">
-                                <p class="flex items-start gap-2">
-                                    <i class="fa-solid fa-location-dot text-gray-400 mt-1 shrink-0"></i>
-                                    <span class="line-clamp-2">${escapeHtml(item.endereco)}</span>
-                                </p>
-                                <p class="flex items-center gap-2">
-                                    <i class="fa-solid fa-map-pin text-gray-400 shrink-0"></i>
-                                    <span>${escapeHtml(item.bairro)} — <strong class="text-gray-700 font-normal">${escapeHtml(item.cidade)}/${escapeHtml(item.uf)}</strong></span>
-                                </p>
-                            </div>
-
-                            <!-- Metadados da Planilha (Última venda, Cadastro, Base) -->
-                            <div class="grid grid-cols-2 gap-y-2 gap-x-1 text-[11px] text-gray-500 bg-gray-50 p-2 rounded border border-gray-100 font-mono">
-                                <div><strong class="text-gray-400 block font-sans">Última Venda:</strong> ${escapeHtml(item.ultimaVenda)}</div>
-                                <div><strong class="text-gray-400 block font-sans">Tempo Cad.:</strong> ${escapeHtml(item.tempoCadastro)}</div>
-                                <div class="col-span-2 border-t border-gray-200/60 mt-1 pt-1"><strong class="text-gray-400 inline font-sans">Data Base:</strong> ${escapeHtml(item.dataBase)}</div>
-                            </div>
-                        </div>
-
-                        <!-- Botão de Ação -->
-                        <div class="p-4 bg-gray-50/70 border-t border-gray-100">
-                            <a href="${mapsLink}" target="_blank" rel="noopener noreferrer"
-                               class="w-full inline-flex justify-center items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-semibold rounded-lg text-xs hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all"
-                               aria-label="Abrir localização no Google Maps">
-                                <i class="fa-solid fa-map-location-dot text-emerald-500"></i> Rota no Google Maps
-                            </a>
-                        </div>
-                    </div>
-                `;
-                container.innerHTML += cardHtml;
+                const originalIndex = db.indexOf(item);
+                tempDiv.innerHTML = generateCardHtml(item, originalIndex);
+                fragment.appendChild(tempDiv.firstElementChild);
             });
+
+            container.appendChild(fragment);
         }
 
         // Função auxiliar para mostrar placeholder
