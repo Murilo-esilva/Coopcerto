@@ -51,13 +51,13 @@
                 </h1>
                 <p class="text-emerald-100 text-xs mt-1">Pesquisa rápida, filtros avançados e integração com mapas.</p>
             </div>
-            <!-- Upload Dinâmico do Arquivo -->
+            <!-- Upload Dinâmico do Arquivo (Opcional) -->
             <div class="bg-emerald-700 p-2 rounded-lg text-sm flex items-center gap-2 shadow-inner">
                 <label for="file-input" class="cursor-pointer bg-white text-emerald-700 px-3 py-1.5 rounded font-semibold text-xs hover:bg-emerald-50 transition-all flex items-center gap-1">
                     <i class="fa-solid fa-file-import"></i> Carregar Planilha (.txt/.csv)
                 </label>
                 <input type="file" id="file-input" accept=".txt,.csv" class="hidden" aria-label="Carregar arquivo CSV ou TXT">
-                <span id="load-status" class="text-emerald-200 text-xs px-2">Nenhum arquivo carregado</span>
+                <span id="load-status" class="text-emerald-200 text-xs px-2">Dados carregados automaticamente</span>
             </div>
         </div>
     </header>
@@ -69,15 +69,15 @@
             <!-- Barra de Busca -->
             <div class="lg:col-span-2 relative">
                 <i class="fa-solid fa-magnifying-glass absolute left-4 top-3.5 text-gray-400"></i>
-                <input type="text" id="search-input" disabled placeholder="Primeiro, carregue um arquivo..." 
-                    class="w-full pl-11 pr-4 py-2.5 bg-gray-200 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                <input type="text" id="search-input" placeholder="Buscar por Fantasia, Razão, Bairro ou Endereço..." 
+                    class="w-full pl-11 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                     aria-label="Buscar por nome, endereço ou bairro">
             </div>
             
             <!-- Filtro de Produto -->
             <div class="relative">
                 <i class="fa-solid fa-filter absolute left-4 top-3.5 text-gray-400 z-10 pointer-events-none"></i>
-                <select id="product-filter" disabled class="w-full pl-11 pr-10 py-2.5 bg-gray-200 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                <select id="product-filter" class="w-full pl-11 pr-10 py-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     aria-label="Filtrar por produto">
                     <option value="todos">Todos os Produtos</option>
                 </select>
@@ -98,9 +98,9 @@
 
         <!-- Estado Inicial / Sem Resultados -->
         <div id="status-placeholder" class="text-center py-20 text-gray-400">
-            <i id="placeholder-icon" class="fa-solid fa-file-lines text-5xl mb-4 text-gray-300 block"></i>
-            <p id="placeholder-text" class="text-lg font-medium">Aguardando importação de dados.</p>
-            <p id="placeholder-subtext" class="text-sm max-w-md mx-auto mt-1">Exporte as colunas da sua planilha como arquivo de texto (separado por tabulação) e carregue no botão acima.</p>
+            <i id="placeholder-icon" class="fa-solid fa-file-lines text-5xl mb-4 text-gray-300 block animate-pulse"></i>
+            <p id="placeholder-text" class="text-lg font-medium">Carregando dados...</p>
+            <p id="placeholder-subtext" class="text-sm max-w-md mx-auto mt-1">Aguarde um momento enquanto os dados são importados.</p>
         </div>
     </main>
 
@@ -126,7 +126,47 @@
         const placeholderText = document.getElementById('placeholder-text');
         const placeholderSubtext = document.getElementById('placeholder-subtext');
 
-        // Captura e processa o arquivo texto/CSV
+        // Carrega dados de um arquivo JSON automaticamente
+        async function loadJsonData() {
+            try {
+                const response = await fetch('data.json');
+                if (!response.ok) throw new Error('Arquivo não encontrado');
+                
+                db = await response.json();
+                
+                if (db.length > 0) {
+                    loadStatus.textContent = `Dados carregados (${db.length} registros)`;
+                    initializeApp();
+                } else {
+                    loadStatus.textContent = "Sem dados disponíveis";
+                    showPlaceholder(true, "Nenhum dado disponível", "O arquivo data.json está vazio ou não contém registros válidos.");
+                }
+            } catch (error) {
+                console.error("Erro ao carregar data.json:", error);
+                loadStatus.textContent = "Erro ao carregar dados";
+                showPlaceholder(true, "Erro ao carregar", "Verifique se o arquivo data.json existe e está no formato correto.");
+            }
+        }
+
+        // Inicializa a aplicação após carregar os dados
+        function initializeApp() {
+            searchInput.disabled = false;
+            productFilter.disabled = false;
+            
+            // Popula dinamicamente o filtro de produtos detectados (ordenado)
+            const detectedProducts = new Set(db.map(item => item.produto));
+            productFilter.innerHTML = '<option value="todos">Todos os Produtos</option>';
+            Array.from(detectedProducts).sort().forEach(prod => {
+                productFilter.innerHTML += `<option value="${prod}">${prod}</option>`;
+            });
+
+            applyFilters();
+        }
+
+        // Carrega JSON ao iniciar a página
+        window.addEventListener('load', loadJsonData);
+
+        // Captura e processa o arquivo texto/CSV (Upload Manual)
         fileInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -184,11 +224,6 @@
 
                     if(db.length > 0) {
                         loadStatus.textContent = `${file.name} (${db.length} registros)`;
-                        // Habilita os inputs de busca e filtros
-                        searchInput.disabled = false;
-                        productFilter.disabled = false;
-                        searchInput.placeholder = "Buscar por Fantasia, Razão, Bairro ou Endereço...";
-                        
                         // Popula dinamicamente o filtro de produtos detectados (ordenado)
                         productFilter.innerHTML = '<option value="todos">Todos os Produtos</option>';
                         Array.from(detectedProducts).sort().forEach(prod => {
@@ -221,10 +256,7 @@
             totalCount.textContent = data.length;
 
             if(data.length === 0) {
-                placeholder.classList.remove('hidden');
-                placeholderIcon.className = "fa-regular fa-face-frown text-5xl mb-4 text-gray-300 block";
-                placeholderText.textContent = "Nenhum resultado encontrado";
-                placeholderSubtext.textContent = "Tente digitar termos diferentes ou limpe os filtros de pesquisa.";
+                showPlaceholder(true, "Nenhum resultado encontrado", "Tente digitar termos diferentes ou limpe os filtros de pesquisa.");
                 return;
             }
 
@@ -283,7 +315,7 @@
                         <!-- Botão de Ação -->
                         <div class="p-4 bg-gray-50/70 border-t border-gray-100">
                             <a href="${mapsLink}" target="_blank" rel="noopener noreferrer"
-                               class="w-full inline-flex justify-center items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-semibold rounded-lg text-xs hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-600 transition-all"
+                               class="w-full inline-flex justify-center items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-semibold rounded-lg text-xs hover:bg-emerald-50 hover:border-emerald-200 transition-all"
                                aria-label="Abrir localização no Google Maps">
                                 <i class="fa-solid fa-map-location-dot text-emerald-500"></i> Rota no Google Maps
                             </a>
@@ -292,6 +324,18 @@
                 `;
                 container.innerHTML += cardHtml;
             });
+        }
+
+        // Função auxiliar para mostrar placeholder
+        function showPlaceholder(show, text, subtext) {
+            if (show) {
+                placeholder.classList.remove('hidden');
+                placeholderIcon.className = "fa-regular fa-face-frown text-5xl mb-4 text-gray-300 block";
+                placeholderText.textContent = text;
+                placeholderSubtext.textContent = subtext;
+            } else {
+                placeholder.classList.add('hidden');
+            }
         }
 
         // Função para escapar HTML e evitar XSS
