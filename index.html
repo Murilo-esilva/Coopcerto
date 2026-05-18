@@ -5,8 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rede Credenciada Coopcerto</title>
     <!-- Tailwind CSS para um design moderno e responsivo -->
-    <script src="https://jsdelivr.net"></script>
-    <link rel="stylesheet" href="https://cloudflare.com">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Oculta o select padrão e adiciona ícone customizado */
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 1rem;
+            padding-right: 2.5rem;
+        }
+
+        /* Melhora visual do scroll mobile */
+        table {
+            scroll-behavior: smooth;
+        }
+
+        /* Animação de carregamento */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+        /* Responsividade melhorada para tabelas */
+        @media (max-width: 640px) {
+            table th, table td {
+                font-size: 0.75rem;
+                padding: 0.5rem;
+            }
+            .container { padding-left: 0.5rem; padding-right: 0.5rem; }
+        }
+    </style>
 </head>
 <body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex flex-col">
 
@@ -24,7 +56,7 @@
                 <label for="file-input" class="cursor-pointer bg-white text-emerald-700 px-3 py-1.5 rounded font-semibold text-xs hover:bg-emerald-50 transition-all flex items-center gap-1">
                     <i class="fa-solid fa-file-import"></i> Carregar Planilha (.txt/.csv)
                 </label>
-                <input type="file" id="file-input" accept=".txt,.csv" class="hidden">
+                <input type="file" id="file-input" accept=".txt,.csv" class="hidden" aria-label="Carregar arquivo CSV ou TXT">
                 <span id="load-status" class="text-emerald-200 text-xs px-2">Nenhum arquivo carregado</span>
             </div>
         </div>
@@ -38,13 +70,15 @@
             <div class="lg:col-span-2 relative">
                 <i class="fa-solid fa-magnifying-glass absolute left-4 top-3.5 text-gray-400"></i>
                 <input type="text" id="search-input" disabled placeholder="Primeiro, carregue um arquivo..." 
-                    class="w-full pl-11 pr-4 py-2.5 bg-gray-200 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all disabled:cursor-not-allowed">
+                    class="w-full pl-11 pr-4 py-2.5 bg-gray-200 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label="Buscar por nome, endereço ou bairro">
             </div>
             
             <!-- Filtro de Produto -->
             <div class="relative">
-                <i class="fa-solid fa-filter absolute left-4 top-3.5 text-gray-400"></i>
-                <select id="product-filter" disabled class="w-full pl-11 pr-4 py-2.5 bg-gray-200 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all appearance-none disabled:cursor-not-allowed">
+                <i class="fa-solid fa-filter absolute left-4 top-3.5 text-gray-400 z-10 pointer-events-none"></i>
+                <select id="product-filter" disabled class="w-full pl-11 pr-10 py-2.5 bg-gray-200 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label="Filtrar por produto">
                     <option value="todos">Todos os Produtos</option>
                 </select>
             </div>
@@ -60,7 +94,7 @@
         </div>
 
         <!-- Grade de Visualização dos Estabelecimentos -->
-        <div id="cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        <div id="cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" role="region" aria-label="Lista de estabelecimentos credenciados"></div>
 
         <!-- Estado Inicial / Sem Resultados -->
         <div id="status-placeholder" class="text-center py-20 text-gray-400">
@@ -78,6 +112,7 @@
     <!-- Lógica JavaScript Dinâmica -->
     <script>
         let db = []; // Armazenará os registros processados do arquivo
+        let debounceTimer; // Para debouncing de busca
 
         const fileInput = document.getElementById('file-input');
         const loadStatus = document.getElementById('load-status');
@@ -100,55 +135,81 @@
             const reader = new FileReader();
 
             reader.onload = function(evt) {
-                const text = evt.target.result;
-                const lines = text.split(/\r?\n/);
-                db = [];
-                const detectedProducts = new Set();
+                try {
+                    const text = evt.target.result;
+                    const lines = text.split(/\r?\n/);
+                    db = [];
+                    const detectedProducts = new Set();
+                    let headerProcessed = false;
 
-                lines.forEach((line) => {
-                    if (!line.trim()) return;
+                    lines.forEach((line, index) => {
+                        if (!line.trim()) return;
 
-                    // Detecta se o delimitador é Tabulação (\t) ou Ponto e Vírgula (;)
-                    const columns = line.includes('\t') ? line.split('\t') : line.split(';');
-                    
-                    // Valida se a linha tem o mínimo de colunas necessárias para não ler cabeçalhos quebrados
-                    if (columns.length >= 8 && !columns[0].includes("CNPJ")) {
-                        const registro = {
-                            cnpj: columns[0]?.trim() || "N/A",
-                            razao: columns[1]?.trim() || "N/A",
-                            fantasia: columns[2]?.trim() || columns[1]?.trim() || "N/A", // Fallback para Razão se Fantasia sumir
-                            endereco: columns[3]?.trim() || "N/A",
-                            bairro: columns[4]?.trim() || "N/A",
-                            cidade: columns[5]?.trim() || "N/A",
-                            uf: columns[6]?.trim() || "N/A",
-                            produto: columns[7]?.trim() || "Não Informado",
-                            ultimaVenda: columns[8]?.trim() || "N/A",
-                            tempoCadastro: columns[9]?.trim() || "N/A",
-                            dataBase: columns[10]?.trim() || "N/A"
-                        };
-                        db.push(registro);
-                        detectedProducts.add(registro.produto);
-                    }
-                });
+                        // Pula a linha de cabeçalho na primeira iteração
+                        if (!headerProcessed && index === 0) {
+                            headerProcessed = true;
+                            return;
+                        }
 
-                if(db.length > 0) {
-                    loadStatus.textContent = file.name;
-                    // Habilita os inputs de busca e filtros
-                    searchInput.disabled = false;
-                    productFilter.disabled = false;
-                    searchInput.placeholder = "Buscar por Fantasia, Razão, Bairro ou Endereço...";
-                    
-                    // Popula dinamicamente o filtro de produtos detectados
-                    productFilter.innerHTML = '<option value="todos">Todos os Produtos</option>';
-                    detectedProducts.forEach(prod => {
-                        productFilter.innerHTML += `<option value="${prod}">${prod}</option>`;
+                        // Detecta se o delimitador é Tabulação (\t) ou Ponto e Vírgula (;)
+                        const columns = line.includes('\t') ? line.split('\t') : line.split(';');
+                        
+                        // Valida se a linha tem o mínimo de colunas necessárias
+                        if (columns.length >= 8) {
+                            try {
+                                const registro = {
+                                    cnpj: (columns[0]?.trim() || "N/A").replace(/\s+/g, ' '),
+                                    razao: (columns[1]?.trim() || "N/A").replace(/\s+/g, ' '),
+                                    fantasia: (columns[2]?.trim() || columns[1]?.trim() || "N/A").replace(/\s+/g, ' '),
+                                    endereco: (columns[3]?.trim() || "N/A").replace(/\s+/g, ' '),
+                                    bairro: (columns[4]?.trim() || "N/A").replace(/\s+/g, ' '),
+                                    cidade: (columns[5]?.trim() || "N/A").replace(/\s+/g, ' '),
+                                    uf: (columns[6]?.trim() || "N/A").replace(/\s+/g, ' '),
+                                    produto: (columns[7]?.trim() || "Não Informado").replace(/\s+/g, ' '),
+                                    ultimaVenda: (columns[8]?.trim() || "N/A").replace(/\s+/g, ' '),
+                                    tempoCadastro: (columns[9]?.trim() || "N/A").replace(/\s+/g, ' '),
+                                    dataBase: (columns[10]?.trim() || "N/A").replace(/\s+/g, ' ')
+                                };
+                                
+                                // Validação: rejeita registros sem dados essenciais
+                                if (registro.endereco !== "N/A" && registro.bairro !== "N/A") {
+                                    db.push(registro);
+                                    detectedProducts.add(registro.produto);
+                                }
+                            } catch (e) {
+                                console.warn(`Erro ao processar linha ${index}:`, e);
+                            }
+                        }
                     });
 
-                    applyFilters();
-                } else {
-                    loadStatus.textContent = "Erro na leitura";
-                    alert("Não foi possível identificar dados válidos. Verifique se o arquivo possui colunas separadas por tabulação ou ponto e vírgula.");
+                    if(db.length > 0) {
+                        loadStatus.textContent = `${file.name} (${db.length} registros)`;
+                        // Habilita os inputs de busca e filtros
+                        searchInput.disabled = false;
+                        productFilter.disabled = false;
+                        searchInput.placeholder = "Buscar por Fantasia, Razão, Bairro ou Endereço...";
+                        
+                        // Popula dinamicamente o filtro de produtos detectados (ordenado)
+                        productFilter.innerHTML = '<option value="todos">Todos os Produtos</option>';
+                        Array.from(detectedProducts).sort().forEach(prod => {
+                            productFilter.innerHTML += `<option value="${prod}">${prod}</option>`;
+                        });
+
+                        applyFilters();
+                    } else {
+                        loadStatus.textContent = "Erro na leitura";
+                        alert("Não foi possível identificar dados válidos. Verifique se o arquivo possui colunas separadas por tabulação ou ponto e vírgula.");
+                    }
+                } catch (error) {
+                    loadStatus.textContent = "Erro no processamento";
+                    console.error("Erro ao processar arquivo:", error);
+                    alert("Ocorreu um erro ao processar o arquivo. Verifique o console para mais detalhes.");
                 }
+            };
+
+            reader.onerror = function() {
+                loadStatus.textContent = "Erro na leitura";
+                alert("Erro ao ler o arquivo.");
             };
 
             reader.readAsText(file, 'UTF-8');
@@ -169,7 +230,7 @@
 
             placeholder.classList.add('hidden');
 
-            data.forEach(item => {
+            data.forEach((item, index) => {
                 // Personalização visual da tag de benefício
                 let badgeClass = "bg-amber-50 text-amber-700 border-amber-200";
                 if (item.produto.toLowerCase().includes("refeição") && item.produto.toLowerCase().includes("alimentação")) {
@@ -180,7 +241,7 @@
 
                 // URL de busca estruturada para o Google Maps
                 const localizacaoCompleta = `${item.endereco}, ${item.bairro}, ${item.cidade} - ${item.uf}`;
-                const mapsLink = `https://google.com{encodeURIComponent(localizacaoCompleta)}`;
+                const mapsLink = `https://www.google.com/maps/search/${encodeURIComponent(localizacaoCompleta)}`;
 
                 const cardHtml = `
                     <div class="bg-white rounded-xl shadow-xs border border-gray-100 hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group">
@@ -195,34 +256,35 @@
                             
                             <!-- Títulos principais (Priorizando Fantasia conforme pedido) -->
                             <h3 class="font-bold text-gray-900 text-lg group-hover:text-emerald-600 transition-colors line-clamp-2" title="Nome Fantasia">
-                                ${item.fantasia}
+                                ${escapeHtml(item.fantasia)}
                             </h3>
-                            <p class="text-xs text-gray-400 mt-0.5 mb-4 truncate" title="Razão Social"><strong>Razão:</strong> ${item.razao}</p>
+                            <p class="text-xs text-gray-400 mt-0.5 mb-4 truncate" title="Razão Social"><strong>Razão:</strong> ${escapeHtml(item.razao)}</p>
                             
                             <!-- Bloco de Localização -->
                             <div class="space-y-2 text-sm text-gray-600 border-b border-gray-100 pb-4 mb-4">
                                 <p class="flex items-start gap-2">
                                     <i class="fa-solid fa-location-dot text-gray-400 mt-1 shrink-0"></i>
-                                    <span class="line-clamp-2">${item.endereco}</span>
+                                    <span class="line-clamp-2">${escapeHtml(item.endereco)}</span>
                                 </p>
                                 <p class="flex items-center gap-2">
                                     <i class="fa-solid fa-map-pin text-gray-400 shrink-0"></i>
-                                    <span>${item.bairro} — <strong class="text-gray-700 font-normal">${item.cidade}/${item.uf}</strong></span>
+                                    <span>${escapeHtml(item.bairro)} — <strong class="text-gray-700 font-normal">${escapeHtml(item.cidade)}/${escapeHtml(item.uf)}</strong></span>
                                 </p>
                             </div>
 
                             <!-- Metadados da Planilha (Última venda, Cadastro, Base) -->
                             <div class="grid grid-cols-2 gap-y-2 gap-x-1 text-[11px] text-gray-500 bg-gray-50 p-2 rounded border border-gray-100 font-mono">
-                                <div><strong class="text-gray-400 block font-sans">Última Venda:</strong> ${item.ultimaVenda}</div>
-                                <div><strong class="text-gray-400 block font-sans">Tempo Cad.:</strong> ${item.tempoCadastro}</div>
-                                <div class="col-span-2 border-t border-gray-200/60 mt-1 pt-1"><strong class="text-gray-400 inline font-sans">Data Base:</strong> ${item.dataBase}</div>
+                                <div><strong class="text-gray-400 block font-sans">Última Venda:</strong> ${escapeHtml(item.ultimaVenda)}</div>
+                                <div><strong class="text-gray-400 block font-sans">Tempo Cad.:</strong> ${escapeHtml(item.tempoCadastro)}</div>
+                                <div class="col-span-2 border-t border-gray-200/60 mt-1 pt-1"><strong class="text-gray-400 inline font-sans">Data Base:</strong> ${escapeHtml(item.dataBase)}</div>
                             </div>
                         </div>
 
                         <!-- Botão de Ação -->
                         <div class="p-4 bg-gray-50/70 border-t border-gray-100">
-                            <a href="${mapsLink}" target="_blank" 
-                               class="w-full inline-flex justify-center items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-semibold rounded-lg text-xs hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all shadow-xs">
+                            <a href="${mapsLink}" target="_blank" rel="noopener noreferrer"
+                               class="w-full inline-flex justify-center items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-semibold rounded-lg text-xs hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-600 transition-all"
+                               aria-label="Abrir localização no Google Maps">
                                 <i class="fa-solid fa-map-location-dot text-emerald-500"></i> Rota no Google Maps
                             </a>
                         </div>
@@ -232,7 +294,14 @@
             });
         }
 
-        // Lógica de filtragem integrada
+        // Função para escapar HTML e evitar XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Lógica de filtragem integrada com debouncing
         function applyFilters() {
             const query = searchInput.value.toLowerCase().trim();
             const selectedProduct = productFilter.value;
@@ -253,9 +322,21 @@
             drawCards(filteredData);
         }
 
-        // Eventos de digitação e filtragem
-        searchInput.addEventListener('input', applyFilters);
+        // Eventos de digitação e filtragem com debouncing para melhor performance
+        searchInput.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(applyFilters, 300);
+        });
+
         productFilter.addEventListener('change', applyFilters);
+
+        // Permite limpar busca com ESC
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                searchInput.value = '';
+                applyFilters();
+            }
+        });
     </script>
 </body>
 </html>
