@@ -126,13 +126,31 @@
         const placeholderText = document.getElementById('placeholder-text');
         const placeholderSubtext = document.getElementById('placeholder-subtext');
 
+        // Normaliza os nomes das propriedades do JSON para lowercase
+        function normalizeData(rawData) {
+            return rawData.map(item => ({
+                cnpj: item["CNPJ"] || "N/A",
+                razao: item["RAZAO SOCIAL"] || "N/A",
+                fantasia: item["NOME FANTASIA"] || item["RAZAO SOCIAL"] || "N/A",
+                endereco: item["ENDERECO"] || "N/A",
+                bairro: item["BAIRRO"] || "N/A",
+                cidade: item["CIDADE"] || "N/A",
+                uf: item["UF"] || "N/A",
+                produto: item["PRODUTO HABILITADO"] || "Não Informado",
+                ultimaVenda: item["ÚLTIMA VENDA COOPCERTO"] || "N/A",
+                tempoCadastro: item["TEMPO DE CADASTRO"] || "N/A",
+                dataBase: item["DATA BASE"] || "N/A"
+            }));
+        }
+
         // Carrega dados de um arquivo JSON automaticamente
         async function loadJsonData() {
             try {
                 const response = await fetch('data.json');
                 if (!response.ok) throw new Error('Arquivo não encontrado');
                 
-                db = await response.json();
+                const rawData = await response.json();
+                db = normalizeData(rawData);
                 
                 if (db.length > 0) {
                     loadStatus.textContent = `Dados carregados (${db.length} registros)`;
@@ -315,7 +333,7 @@
                         <!-- Botão de Ação -->
                         <div class="p-4 bg-gray-50/70 border-t border-gray-100">
                             <a href="${mapsLink}" target="_blank" rel="noopener noreferrer"
-                               class="w-full inline-flex justify-center items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-semibold rounded-lg text-xs hover:bg-emerald-50 hover:border-emerald-200 transition-all"
+                               class="w-full inline-flex justify-center items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-semibold rounded-lg text-xs hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all"
                                aria-label="Abrir localização no Google Maps">
                                 <i class="fa-solid fa-map-location-dot text-emerald-500"></i> Rota no Google Maps
                             </a>
