@@ -1,6 +1,49 @@
 /* ============================================
    CUSTOM STYLES - Coopcerto Portal
+   Light & Dark Theme Support
    ============================================ */
+
+/* ============================================
+   CSS Variables - Tema Claro e Escuro
+   ============================================ */
+:root {
+    --color-primary: #059669;
+    --color-primary-dark: #047857;
+    --color-primary-light: #10b981;
+    --color-bg: #f9fafb;
+    --color-surface: #ffffff;
+    --color-border: #e5e7eb;
+    --color-text: #1f2937;
+    --color-text-secondary: #6b7280;
+    --color-text-tertiary: #9ca3af;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+html.dark {
+    --color-primary: #10b981;
+    --color-primary-dark: #059669;
+    --color-primary-light: #6ee7b7;
+    --color-bg: #111827;
+    --color-surface: #1f2937;
+    --color-border: #374151;
+    --color-text: #f3f4f6;
+    --color-text-secondary: #d1d5db;
+    --color-text-tertiary: #9ca3af;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   Body & Global Styles
+   ============================================ */
+body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
 
 /* Select customizado */
 select {
@@ -12,11 +55,146 @@ select {
     padding-right: 2.5rem;
 }
 
+html.dark select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23d1d5db' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+}
+
 /* Smooth scroll behavior */
 html {
     scroll-behavior: smooth;
 }
 
+/* ============================================
+   Inputs & Form Elements
+   ============================================ */
+input,
+select {
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    border-color: var(--color-border);
+}
+
+input::placeholder {
+    color: var(--color-text-tertiary);
+}
+
+input:focus,
+select:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+}
+
+html.dark input:focus,
+html.dark select:focus {
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+/* Melhor visual de disabled inputs */
+input:disabled,
+select:disabled,
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ============================================
+   Cards & Establishment Elements
+   ============================================ */
+.establishment-card {
+    background-color: var(--color-surface);
+    border-color: var(--color-border);
+    transition: all 0.3s ease;
+}
+
+.establishment-card:hover {
+    box-shadow: 0 10px 25px rgba(5, 150, 105, 0.15);
+    transform: translateY(-2px);
+}
+
+html.dark .establishment-card:hover {
+    box-shadow: 0 10px 25px rgba(16, 185, 129, 0.1);
+}
+
+/* Cards hover effects */
+.card-hover-lift {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.card-hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* ============================================
+   Badges
+   ============================================ */
+.badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    border: 1px solid;
+}
+
+.badge-product {
+    background-color: rgba(5, 150, 105, 0.1);
+    color: var(--color-primary);
+    border-color: rgba(5, 150, 105, 0.3);
+    transition: all 0.2s ease;
+}
+
+html.dark .badge-product {
+    background-color: rgba(16, 185, 129, 0.15);
+    color: #6ee7b7;
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+/* ============================================
+   Progress Bar
+   ============================================ */
+progress {
+    width: 100%;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    background-color: var(--color-border);
+}
+
+progress::-webkit-progress-bar {
+    background-color: var(--color-border);
+}
+
+progress::-webkit-progress-value {
+    background-color: var(--color-primary-light);
+    transition: width 0.3s ease;
+}
+
+progress::-moz-progress-bar {
+    background-color: var(--color-primary-light);
+    transition: width 0.3s ease;
+}
+
+/* ============================================
+   Links & Text
+   ============================================ */
+a {
+    color: var(--color-primary);
+    transition: color 0.2s ease;
+}
+
+a:hover {
+    color: var(--color-primary-dark);
+}
+
+/* Melhor contraste de texto */
+body {
+    line-height: 1.6;
+}
+
+/* ============================================
+   Animations
+   ============================================ */
 /* Animação de carregamento (pulse) */
 @keyframes pulse {
     0%, 100% { 
@@ -31,14 +209,60 @@ html {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; 
 }
 
-/* Cards hover effects */
-.card-hover-lift {
-    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+/* Slide in animation */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.card-hover-lift:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+.establishment-card {
+    animation: slideIn 0.3s ease-out;
+}
+
+/* ============================================
+   Scroll Bar Styling
+   ============================================ */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--color-bg);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-secondary);
+}
+
+/* ============================================
+   Accessibility
+   ============================================ */
+/* Focus visible styles para melhor acessibilidade */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+html.dark button:focus-visible,
+html.dark a:focus-visible,
+html.dark input:focus-visible,
+html.dark select:focus-visible {
+    outline-color: var(--color-primary-light);
 }
 
 /* Screen reader only content */
@@ -54,16 +278,14 @@ html {
     border-width: 0;
 }
 
-/* Focus visible styles para melhor acessibilidade */
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible {
-    outline: 2px solid #10b981;
-    outline-offset: 2px;
+/* Placeholder icons */
+.placeholder-empty {
+    opacity: 0.5;
 }
 
-/* Responsive optimizations */
+/* ============================================
+   Responsive Optimizations
+   ============================================ */
 @media (max-width: 640px) {
     .container { 
         padding-left: 0.5rem; 
@@ -86,79 +308,20 @@ select:focus-visible {
     }
 }
 
-/* Melhor contraste de texto */
-body {
-    line-height: 1.6;
+/* ============================================
+   Reduced Motion Support
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 
-/* Loading progress bar */
-progress {
-    width: 100%;
-    height: 8px;
-    border-radius: 4px;
-    overflow: hidden;
-    background-color: #e5e7eb;
-}
-
-progress::-webkit-progress-bar {
-    background-color: #e5e7eb;
-}
-
-progress::-webkit-progress-value {
-    background-color: #10b981;
-    transition: width 0.3s ease;
-}
-
-progress::-moz-progress-bar {
-    background-color: #10b981;
-    transition: width 0.3s ease;
-}
-
-/* Melhor visual para links */
-a {
-    transition: color 0.2s ease;
-}
-
-a:hover {
-    color: #059669;
-}
-
-/* Placeholder icons */
-.placeholder-empty {
-    opacity: 0.5;
-}
-
-/* Card badges */
-.badge {
-    display: inline-block;
-    padding: 0.25rem 0.75rem;
-    border-radius: 9999px;
-    font-size: 0.6875rem;
-    font-weight: 600;
-    border: 1px solid;
-}
-
-/* Melhor visual de disabled inputs */
-input:disabled,
-select:disabled,
-button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-/* Animações suaves */
-* {
-    transition-property: background-color, border-color, color;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition-duration: 150ms;
-}
-
-/* Desabilitar transições para elementos específicos */
-.no-transition {
-    transition: none !important;
-}
-
-/* Print styles */
+/* ============================================
+   Print Styles
+   ============================================ */
 @media print {
     header, footer, .controls {
         display: none;
@@ -168,4 +331,23 @@ button:disabled {
         page-break-inside: avoid;
         border: 1px solid #000;
     }
+    
+    body {
+        background-color: white;
+        color: black;
+    }
+}
+
+/* ============================================
+   Transições Suaves
+   ============================================ */
+* {
+    transition-property: background-color, border-color, color;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+}
+
+/* Desabilitar transições para elementos específicos */
+.no-transition {
+    transition: none !important;
 }
