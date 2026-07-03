@@ -35,7 +35,6 @@ const DOM = {
     container: document.getElementById('cards-container'),
     searchInput: document.getElementById('search-input'),
     productFilter: document.getElementById('product-filter'),
-    // novo filtro de cidade (adicione uma <select id="city-filter"> no HTML)
     cityFilter: document.getElementById('city-filter'),
     totalCount: document.getElementById('total-count'),
     placeholder: document.getElementById('status-placeholder'),
@@ -53,23 +52,34 @@ const DOM = {
 
 /**
  * Normaliza propriedades de JSON para formato padrão
+ * Suporta variações de nomes de campos (com e sem espaços/underscores)
  * @param {Array} rawData - Dados brutos do JSON
  * @returns {Array} Dados normalizados
  */
 function normalizeData(rawData) {
-    return rawData.map(item => ({
-        cnpj: item["CNPJ"] || "N/A",
-        razao: item["RAZAO SOCIAL"] || "N/A",
-        fantasia: item["NOME FANTASIA"] || item["RAZAO SOCIAL"] || "N/A",
-        endereco: item["ENDERECO"] || "N/A",
-        bairro: item["BAIRRO"] || "N/A",
-        cidade: item["CIDADE"] || "N/A",
-        uf: item["UF"] || "N/A",
-        produto: item["PRODUTO HABILITADO"] || "Não Informado",
-        ultimaVenda: item["ÚLTIMA VENDA COOPCERTO"] || "N/A",
-        tempoCadastro: item["TEMPO DE CADASTRO"] || "N/A",
-        dataBase: item["DATA BASE"] || "N/A"
-    }));
+    return rawData.map(item => {
+        // Função auxiliar para buscar valor com múltiplas variações de chave
+        const getValue = (keys) => {
+            for (let key of keys) {
+                if (item[key]) return item[key];
+            }
+            return "N/A";
+        };
+
+        return {
+            cnpj: getValue(["CNPJ"]),
+            razao: getValue(["RAZAO_SOCIAL", "RAZAO SOCIAL"]),
+            fantasia: getValue(["NOME_FANTASIA", "NOME FANTASIA"]) || getValue(["RAZAO_SOCIAL", "RAZAO SOCIAL"]),
+            endereco: getValue(["ENDERECO", "ENDEREÇO"]),
+            bairro: getValue(["BAIRRO"]),
+            cidade: getValue(["CIDADE"]),
+            uf: getValue(["UF"]),
+            produto: getValue(["PRODUTO_HABILITADO", "PRODUTO HABILITADO", "PRODUTO"]),
+            ultimaVenda: getValue(["ULTIMA_VENDA_COOPCERTO", "ÚLTIMA VENDA COOPCERTO"]),
+            tempoCadastro: getValue(["TEMPO_DE_CADASTRO", "TEMPO DE CADASTRO"]),
+            dataBase: getValue(["DATA_BASE", "DATA BASE"])
+        };
+    });
 }
 
 /**
@@ -189,12 +199,12 @@ function getBadgeClass(product) {
     const productLower = product.toLowerCase();
     
     if (productLower.includes("refeição") && productLower.includes("alimentação")) {
-        return "bg-blue-50 text-blue-700 border-blue-200";
+        return "bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 border-blue-200 dark:border-blue-700";
     } else if (productLower.includes("refeição")) {
-        return "bg-emerald-50 text-emerald-700 border-emerald-200";
+        return "bg-emerald-50 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-200 border-emerald-200 dark:border-emerald-700";
     }
     
-    return "bg-amber-50 text-amber-700 border-amber-200";
+    return "bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-200 border-amber-200 dark:border-amber-700";
 }
 
 /**
@@ -216,7 +226,7 @@ function generateMapsLink(item) {
 function showPlaceholder(show, text, subtext) {
     if (show) {
         DOM.placeholder.classList.remove('hidden');
-        DOM.placeholderIcon.className = "fa-regular fa-face-frown text-5xl mb-4 text-gray-300 block";
+        DOM.placeholderIcon.className = "fa-regular fa-face-frown text-5xl mb-4 text-gray-300 dark:text-gray-600 block";
         DOM.placeholderText.textContent = text;
         DOM.placeholderSubtext.textContent = subtext;
     } else {
@@ -264,47 +274,47 @@ function generateCardHtml(item, index) {
     const mapsLink = generateMapsLink(item);
 
     const cardHtml = `
-        <div class="bg-white rounded-xl shadow-xs border border-gray-100 hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xs border border-gray-100 dark:border-gray-700 hover:shadow-md dark:hover:shadow-lg transition-all flex flex-col justify-between overflow-hidden group">
             <div class="p-5">
                 <div class="flex justify-between items-start gap-2 mb-3">
                     <span class="px-2.5 py-0.5 text-[11px] font-semibold rounded-full border ${badgeClass}">
                         ${escapeHtml(item.produto)}
                     </span>
-                    <span class="text-[10px] text-gray-400 font-mono" title="CNPJ">${escapeHtml(item.cnpj)}</span>
+                    <span class="text-[10px] text-gray-400 dark:text-gray-500 font-mono" title="CNPJ">${escapeHtml(item.cnpj)}</span>
                 </div>
                 
-                <h3 class="font-bold text-gray-900 text-lg group-hover:text-emerald-600 transition-colors line-clamp-2" title="Nome Fantasia">
+                <h3 class="font-bold text-gray-900 dark:text-gray-100 text-lg group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors line-clamp-2" title="Nome Fantasia">
                     ${escapeHtml(item.fantasia)}
                 </h3>
-                <p class="text-xs text-gray-400 mt-0.5 mb-4 truncate" title="Razão Social">
+                <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5 mb-4 truncate" title="Razão Social">
                     <strong>Razão:</strong> ${escapeHtml(item.razao)}
                 </p>
                 
-                <div class="space-y-2 text-sm text-gray-600 border-b border-gray-100 pb-4 mb-4">
+                <div class="space-y-2 text-sm text-gray-600 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700 pb-4 mb-4">
                     <p class="flex items-start gap-2">
-                        <i class="fa-solid fa-location-dot text-gray-400 mt-1 shrink-0" aria-hidden="true"></i>
+                        <i class="fa-solid fa-location-dot text-gray-400 dark:text-gray-500 mt-1 shrink-0" aria-hidden="true"></i>
                         <span class="line-clamp-2">${escapeHtml(item.endereco)}</span>
                     </p>
                     <p class="flex items-center gap-2">
-                        <i class="fa-solid fa-map-pin text-gray-400 shrink-0" aria-hidden="true"></i>
-                        <span>${escapeHtml(item.bairro)} — <strong class="text-gray-700 font-normal">${escapeHtml(item.cidade)}/${escapeHtml(item.uf)}</strong></span>
+                        <i class="fa-solid fa-map-pin text-gray-400 dark:text-gray-500 shrink-0" aria-hidden="true"></i>
+                        <span>${escapeHtml(item.bairro)} — <strong class="text-gray-700 dark:text-gray-300 font-normal">${escapeHtml(item.cidade)}/${escapeHtml(item.uf)}</strong></span>
                     </p>
                 </div>
 
-                <div class="grid grid-cols-2 gap-y-2 gap-x-1 text-[11px] text-gray-500 bg-gray-50 p-2 rounded border border-gray-100 font-mono">
-                    <div><strong class="text-gray-400 block font-sans">Última Venda:</strong> ${escapeHtml(item.ultimaVenda)}</div>
-                    <div><strong class="text-gray-400 block font-sans">Tempo Cad.:</strong> ${escapeHtml(item.tempoCadastro)}</div>
-                    <div class="col-span-2 border-t border-gray-200/60 mt-1 pt-1"><strong class="text-gray-400 inline font-sans">Data Base:</strong> ${escapeHtml(item.dataBase)}</div>
+                <div class="grid grid-cols-2 gap-y-2 gap-x-1 text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-100 dark:border-gray-600 font-mono">
+                    <div><strong class="text-gray-400 dark:text-gray-500 block font-sans">Última Venda:</strong> ${escapeHtml(item.ultimaVenda)}</div>
+                    <div><strong class="text-gray-400 dark:text-gray-500 block font-sans">Tempo Cad.:</strong> ${escapeHtml(item.tempoCadastro)}</div>
+                    <div class="col-span-2 border-t border-gray-200 dark:border-gray-600 mt-1 pt-1"><strong class="text-gray-400 dark:text-gray-500 inline font-sans">Data Base:</strong> ${escapeHtml(item.dataBase)}</div>
                 </div>
             </div>
 
-            <div class="p-4 bg-gray-50/70 border-t border-gray-100">
+            <div class="p-4 bg-gray-50 dark:bg-gray-700 border-t border-gray-100 dark:border-gray-600">
                 <a href="${mapsLink}" 
                    target="_blank" 
                    rel="noopener noreferrer"
-                   class="w-full inline-flex justify-center items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-semibold rounded-lg text-xs hover:bg-emerald-50 hover:border[...]"
+                   class="w-full inline-flex justify-center items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold rounded-lg text-xs hover:bg-emerald-50 dark:hover:bg-emerald-700 hover:border-emerald-300 dark:hover:border-emerald-600 transition-all"
                    aria-label="Abrir localização de ${escapeHtml(item.fantasia)} no Google Maps">
-                    <i class="fa-solid fa-map-location-dot text-emerald-500" aria-hidden="true"></i> Rota no Google Maps
+                    <i class="fa-solid fa-map-location-dot text-emerald-500 dark:text-emerald-400" aria-hidden="true"></i> Rota no Google Maps
                 </a>
             </div>
         </div>
@@ -349,6 +359,7 @@ function drawCards(data) {
 
 /**
  * Aplica filtros de busca, produto e cidade
+ * Corrigido: comparação exata de cidade normalizada
  */
 function applyFilters() {
     const query = DOM.searchInput.value || '';
@@ -361,8 +372,9 @@ function applyFilters() {
 
         const matchesProduct = (selectedProduct === 'todos') || (item.produto === selectedProduct);
 
+        // Comparação exata de cidade normalizada
         const matchesCity = (selectedCity === 'todas') || (
-            (item._cidadeNorm || '').includes(selectedCity)
+            (item._cidadeNorm || '') === selectedCity
         );
 
         return matchesSearch && matchesProduct && matchesCity;
@@ -389,6 +401,7 @@ function clearAllFilters() {
 
 /**
  * Carrega dados de data.json automaticamente
+ * Adicionado logging para debug
  */
 async function loadJsonData() {
     try {
@@ -396,8 +409,13 @@ async function loadJsonData() {
         if (!response.ok) throw new Error('Arquivo não encontrado');
         
         const rawData = await response.json();
+        console.log(`✓ Dados brutos carregados: ${rawData.length} registros`);
+        
         const normalized = normalizeData(rawData);
+        console.log(`✓ Dados normalizados: ${normalized.length} registros`);
+        
         state.db = prepareRecords(normalized);
+        console.log(`✓ Dados preparados: ${state.db.length} registros`);
         
         if (state.db.length > 0) {
             updateLoadStatus(`Dados carregados (${state.db.length} registros)`);
@@ -407,7 +425,7 @@ async function loadJsonData() {
             showPlaceholder(true, "Nenhum dado disponível", "O arquivo data.json está vazio ou não contém registros válidos.");
         }
     } catch (error) {
-        console.error("Erro ao carregar data.json:", error);
+        console.error("❌ Erro ao carregar data.json:", error);
         updateLoadStatus("Erro ao carregar dados");
         showPlaceholder(true, "Erro ao carregar", "Verifique se o arquivo data.json existe e está no formato correto.");
     }
@@ -439,7 +457,6 @@ function handleFileUpload(file) {
             const { data, products, cities } = parseCSVData(text);
             
             state.reset();
-            // prepare records for search and normalization
             state.db = prepareRecords(data);
 
             if (state.db.length > 0) {
