@@ -312,7 +312,7 @@ function generateCardHtml(item, index) {
                 <a href="${mapsLink}" 
                    target="_blank" 
                    rel="noopener noreferrer"
-                   class="w-full inline-flex justify-center items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold rounded-lg text-xs hover:bg-emerald-50 dark:hover:bg-emerald-700 hover:border-emerald-300 dark:hover:border-emerald-600 transition-all"
+                   class="w-full inline-flex justify-center items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold text-sm rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900 hover:border-emerald-200 dark:hover:border-emerald-700 transition-colors duration-200"
                    aria-label="Abrir localização de ${escapeHtml(item.fantasia)} no Google Maps">
                     <i class="fa-solid fa-map-location-dot text-emerald-500 dark:text-emerald-400" aria-hidden="true"></i> Rota no Google Maps
                 </a>
@@ -359,7 +359,6 @@ function drawCards(data) {
 
 /**
  * Aplica filtros de busca, produto e cidade
- * Corrigido: comparação exata de cidade normalizada
  */
 function applyFilters() {
     const query = DOM.searchInput.value || '';
@@ -369,13 +368,8 @@ function applyFilters() {
 
     const filteredData = state.db.filter(item => {
         const matchesSearch = !qNorm || (item._search && item._search.includes(qNorm));
-
         const matchesProduct = (selectedProduct === 'todos') || (item.produto === selectedProduct);
-
-        // Comparação exata de cidade normalizada
-        const matchesCity = (selectedCity === 'todas') || (
-            (item._cidadeNorm || '') === selectedCity
-        );
+        const matchesCity = (selectedCity === 'todas') || (item._cidadeNorm === selectedCity);
 
         return matchesSearch && matchesProduct && matchesCity;
     });
@@ -401,7 +395,6 @@ function clearAllFilters() {
 
 /**
  * Carrega dados de data.json automaticamente
- * Adicionado logging para debug
  */
 async function loadJsonData() {
     try {
@@ -513,11 +506,11 @@ function populateCityFilter(cities) {
     if (!DOM.cityFilter) return;
     DOM.cityFilter.innerHTML = '<option value="todas">Todas as Cidades</option>';
     Array.from(cities)
-        .sort((a,b) => normalizeString(a).localeCompare(normalizeString(b)))
+        .sort((a, b) => normalizeString(a).localeCompare(normalizeString(b)))
         .forEach(city => {
             const option = document.createElement('option');
-            option.value = normalizeString(city); // value normalizado para comparação robusta
-            option.textContent = city; // exibe o nome original
+            option.value = normalizeString(city);
+            option.textContent = city;
             DOM.cityFilter.appendChild(option);
         });
 }
