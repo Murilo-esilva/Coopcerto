@@ -35,6 +35,8 @@ const DOM = {
     container: document.getElementById('cards-container'),
     searchInput: document.getElementById('search-input'),
     productFilter: document.getElementById('product-filter'),
+    // novo filtro de cidade (adicione uma <select id="city-filter"> no HTML)
+    cityFilter: document.getElementById('city-filter'),
     totalCount: document.getElementById('total-count'),
     placeholder: document.getElementById('status-placeholder'),
     placeholderIcon: document.getElementById('placeholder-icon'),
@@ -73,12 +75,13 @@ function normalizeData(rawData) {
 /**
  * Processa arquivo CSV/TXT e retorna dados normalizados
  * @param {string} text - Conteúdo do arquivo
- * @returns {Object} {data: Array, products: Set}
+ * @returns {Object} {data: Array, products: Set, cities: Set}
  */
 function parseCSVData(text) {
     const lines = text.split(/\r?\n/);
     const records = [];
     const detectedProducts = new Set();
+    const detectedCities = new Set();
     let headerProcessed = false;
 
     lines.forEach((line, index) => {
@@ -113,6 +116,7 @@ function parseCSVData(text) {
                 if (record.endereco !== "N/A" && record.bairro !== "N/A") {
                     records.push(record);
                     detectedProducts.add(record.produto);
+                    if (record.cidade && record.cidade !== 'N/A') detectedCities.add(record.cidade);
                 }
             } catch (e) {
                 console.warn(`Erro ao processar linha ${index}:`, e);
@@ -120,7 +124,7 @@ function parseCSVData(text) {
         }
     });
 
-    return { data: records, products: detectedProducts };
+    return { data: records, products: detectedProducts, cities: detectedCities };
 }
 
 // ============================================
@@ -260,7 +264,7 @@ function generateCardHtml(item, index) {
                 <a href="${mapsLink}" 
                    target="_blank" 
                    rel="noopener noreferrer"
-                   class="w-full inline-flex justify-center items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-semibold rounded-lg text-xs hover:bg-emerald-50 hover:border-emerald-300 transition-colors"
+                   class="w-full inline-flex justify-center items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-semibold rounded-lg text-xs hover:bg-emerald-50 hover:border[...]"
                    aria-label="Abrir localização de ${escapeHtml(item.fantasia)} no Google Maps">
                     <i class="fa-solid fa-map-location-dot text-emerald-500" aria-hidden="true"></i> Rota no Google Maps
                 </a>
@@ -306,11 +310,12 @@ function drawCards(data) {
 // ============================================
 
 /**
- * Aplica filtros de busca e produto
+ * Aplica filtros de busca, produto e cidade
  */
 function applyFilters() {
     const query = DOM.searchInput.value.toLowerCase().trim();
-    const selectedProduct = DOM.productFilter.value;
+    const selectedProduct = DOM.productFilter ? DOM.productFilter.value : 'todos';
+    const selectedCity = DOM.cityFilter ? DOM.cityFilter.value : 'todas';
 
     const filteredData = state.db.filter(item => {
         const matchesSearch = 
@@ -322,7 +327,11 @@ function applyFilters() {
 
         const matchesProduct = (selectedProduct === 'todos') || (item.produto === selectedProduct);
 
-        return matchesSearch && matchesProduct;
+        const matchesCity = (selectedCity === 'todas') || (
+            item.cidade && item.cidade.toLowerCase().trim() === selectedCity.toLowerCase().trim()
+        );
+
+        return matchesSearch && matchesProduct && matchesCity;
     });
 
     state.filteredDataCache = filteredData;
@@ -334,7 +343,8 @@ function applyFilters() {
  */
 function clearAllFilters() {
     DOM.searchInput.value = '';
-    DOM.productFilter.value = 'todos';
+    if (DOM.productFilter) DOM.productFilter.value = 'todos';
+    if (DOM.cityFilter) DOM.cityFilter.value = 'todas';
     applyFilters();
     DOM.searchInput.focus();
 }
@@ -391,7 +401,7 @@ function handleFileUpload(file) {
     reader.onload = (evt) => {
         try {
             const text = evt.target.result;
-            const { data, products } = parseCSVData(text);
+            const { data, products, cities } = parseCSVData(text);
             
             state.reset();
             state.db = data;
@@ -399,6 +409,7 @@ function handleFileUpload(file) {
             if (state.db.length > 0) {
                 updateLoadStatus(`${file.name} (${state.db.length} registros)`);
                 populateProductFilter(products);
+                populateCityFilter(cities);
                 state.db.forEach((item, index) => generateCardHtml(item, index));
                 applyFilters();
             } else {
@@ -429,6 +440,7 @@ function handleFileUpload(file) {
  * @param {Set} products - Conjunto de produtos
  */
 function populateProductFilter(products) {
+    if (!DOM.productFilter) return;
     DOM.productFilter.innerHTML = '<option value="todos">Todos os Produtos</option>';
     Array.from(products)
         .sort()
@@ -441,18 +453,39 @@ function populateProductFilter(products) {
 }
 
 /**
+ * Popula o filtro de cidades detectadas
+ * @param {Set} cities - Conjunto de cidades
+ */
+function populateCityFilter(cities) {
+    if (!DOM.cityFilter) return;
+    DOM.cityFilter.innerHTML = '<option value="todas">Todas as Cidades</option>';
+    Array.from(cities)
+        .sort()
+        .forEach(city => {
+            const option = document.createElement('option');
+            option.value = city;
+            option.textContent = city;
+            DOM.cityFilter.appendChild(option);
+        });
+}
+
+/**
  * Inicializa a aplicação após carregar dados
  */
 function initializeApp() {
     DOM.searchInput.disabled = false;
-    DOM.productFilter.disabled = false;
+    if (DOM.productFilter) DOM.productFilter.disabled = false;
+    if (DOM.cityFilter) DOM.cityFilter.disabled = false;
     
     // Pré-gera todos os cards
     state.db.forEach((item, index) => generateCardHtml(item, index));
     
-    // Popula filtro de produtos
+    // Popula filtro de produtos e cidades
     const detectedProducts = new Set(state.db.map(item => item.produto));
     populateProductFilter(detectedProducts);
+
+    const detectedCities = new Set(state.db.map(item => item.cidade).filter(Boolean));
+    populateCityFilter(detectedCities);
 
     applyFilters();
 }
@@ -477,7 +510,10 @@ DOM.searchInput.addEventListener('input', () => {
 });
 
 // Mudança de filtro de produto
-DOM.productFilter.addEventListener('change', applyFilters);
+if (DOM.productFilter) DOM.productFilter.addEventListener('change', applyFilters);
+
+// Mudança de filtro de cidade
+if (DOM.cityFilter) DOM.cityFilter.addEventListener('change', applyFilters);
 
 // Limpar busca com ESC
 DOM.searchInput.addEventListener('keydown', (e) => {
