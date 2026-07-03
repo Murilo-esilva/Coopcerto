@@ -132,6 +132,44 @@ function parseCSVData(text) {
 // ============================================
 
 /**
+ * Normaliza strings para busca: remove acentos, trim, lowercase
+ * @param {string} s
+ * @returns {string}
+ */
+function normalizeString(s) {
+    if (!s && s !== 0) return '';
+    return String(s)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+}
+
+/**
+ * Prepara registros adicionando campos auxiliares para busca (_search)
+ * @param {Array} records
+ * @returns {Array}
+ */
+function prepareRecords(records) {
+    return records.map(item => {
+        const searchParts = [
+            item.fantasia,
+            item.razao,
+            item.endereco,
+            item.bairro,
+            item.cidade,
+            item.cnpj
+        ].map(normalizeString).filter(Boolean);
+
+        return {
+            ...item,
+            _search: searchParts.join(' '),
+            _cidadeNorm: normalizeString(item.cidade)
+        };
+    });
+}
+
+/**
  * Escapa conteúdo HTML para prevenir XSS
  * @param {string} text - Texto a escapar
  * @returns {string} Texto escapado
@@ -313,22 +351,18 @@ function drawCards(data) {
  * Aplica filtros de busca, produto e cidade
  */
 function applyFilters() {
-    const query = DOM.searchInput.value.toLowerCase().trim();
+    const query = DOM.searchInput.value || '';
+    const qNorm = normalizeString(query);
     const selectedProduct = DOM.productFilter ? DOM.productFilter.value : 'todos';
     const selectedCity = DOM.cityFilter ? DOM.cityFilter.value : 'todas';
 
     const filteredData = state.db.filter(item => {
-        const matchesSearch = 
-            item.fantasia.toLowerCase().includes(query) ||
-            item.razao.toLowerCase().includes(query) ||
-            item.bairro.toLowerCase().includes(query) ||
-            item.endereco.toLowerCase().includes(query) ||
-            item.cnpj.includes(query);
+        const matchesSearch = !qNorm || (item._search && item._search.includes(qNorm));
 
         const matchesProduct = (selectedProduct === 'todos') || (item.produto === selectedProduct);
 
         const matchesCity = (selectedCity === 'todas') || (
-            item.cidade && item.cidade.toLowerCase().trim() === selectedCity.toLowerCase().trim()
+            (item._cidadeNorm || '').includes(selectedCity)
         );
 
         return matchesSearch && matchesProduct && matchesCity;
@@ -362,7 +396,8 @@ async function loadJsonData() {
         if (!response.ok) throw new Error('Arquivo não encontrado');
         
         const rawData = await response.json();
-        state.db = normalizeData(rawData);
+        const normalized = normalizeData(rawData);
+        state.db = prepareRecords(normalized);
         
         if (state.db.length > 0) {
             updateLoadStatus(`Dados carregados (${state.db.length} registros)`);
@@ -404,7 +439,8 @@ function handleFileUpload(file) {
             const { data, products, cities } = parseCSVData(text);
             
             state.reset();
-            state.db = data;
+            // prepare records for search and normalization
+            state.db = prepareRecords(data);
 
             if (state.db.length > 0) {
                 updateLoadStatus(`${file.name} (${state.db.length} registros)`);
@@ -460,11 +496,11 @@ function populateCityFilter(cities) {
     if (!DOM.cityFilter) return;
     DOM.cityFilter.innerHTML = '<option value="todas">Todas as Cidades</option>';
     Array.from(cities)
-        .sort()
+        .sort((a,b) => normalizeString(a).localeCompare(normalizeString(b)))
         .forEach(city => {
             const option = document.createElement('option');
-            option.value = city;
-            option.textContent = city;
+            option.value = normalizeString(city); // value normalizado para comparação robusta
+            option.textContent = city; // exibe o nome original
             DOM.cityFilter.appendChild(option);
         });
 }
